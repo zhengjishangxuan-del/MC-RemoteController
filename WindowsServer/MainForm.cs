@@ -16,6 +16,8 @@ namespace MCRemoteController
         private string _connectedClientIp;
         private bool _isExiting = false;
         private bool _autoInstallDone = false;
+        private bool _toolWarningShown = false;
+        private bool _isInstalling = false;
 
         public MainForm()
         {
@@ -329,17 +331,18 @@ namespace MCRemoteController
                     Log("检测到 iOS 设备: " + deviceName);
 
                     // 如果勾选了自动安装且还没安装过，则自动安装
-                    if (chkAutoInstall.Checked && !_autoInstallDone)
+                    if (chkAutoInstall.Checked && !_autoInstallDone && !_isInstalling)
                     {
                         if (_deviceManager.IsToolsAvailable)
                         {
                             Log("自动安装已启用，开始安装 IPA...");
                             InstallIpaToDevice();
                         }
-                        else
+                        else if (!_toolWarningShown)
                         {
-                            Log("检测到设备，但未安装 libimobiledevice 工具，无法自动安装 IPA");
-                            Log("请安装 libimobiledevice 后点击「安装到 iPad」按钮");
+                            _toolWarningShown = true;
+                            Log("检测到设备，但未安装 libimobiledevice/iTunes，无法自动安装 IPA");
+                            Log("请用 Sideloadly 手动安装 IPA，或安装 iTunes 后重试");
                         }
                     }
                 }
@@ -359,15 +362,32 @@ namespace MCRemoteController
         private void InstallIpaToDevice()
         {
             if (_deviceManager == null) return;
-
-            if (!_deviceManager.IsToolsAvailable)
-            {
-                MessageBox.Show("未检测到 libimobiledevice 工具，无法安装 IPA。\n\n请安装 libimobiledevice 或 iTunes 后重试。\n下载地址: https://github.com/libimobiledevice/libimobiledevice/releases", "提示", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                return;
-            }
+            if (_isInstalling) return;
+            _isInstalling = true;
 
             try
             {
+                if (!_deviceManager.IsToolsAvailable)
+                {
+                    if (!_toolWarningShown)
+                    {
+                        _toolWarningShown = true;
+                        MessageBox.Show(
+                            "检测到 iPad 已连接，但未安装 libimobiledevice 工具，无法在此程序内自动安装 IPA。\n\n" +
+                            "推荐方案：用 Sideloadly 手动安装 IPA（你之前已经在用）。\n" +
+                            "1. 打开 Sideloadly\n" +
+                            "2. 把 MCRemoteClient.ipa 拖进去\n" +
+                            "3. 填入 Apple ID，点 Start 即可安装\n\n" +
+                            "或者安装 iTunes 后重启本程序，即可在此自动安装。",
+                            "安装 IPA", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    }
+                    else
+                    {
+                        Log("未安装 libimobiledevice，无法自动安装 IPA，请用 Sideloadly 安装");
+                    }
+                    return;
+                }
+
                 // 先用 WMI 检测设备是否连接
                 string[] devices = _deviceManager.GetConnectedDevices();
                 if (devices.Length == 0)
@@ -424,6 +444,7 @@ namespace MCRemoteController
             }
             finally
             {
+                _isInstalling = false;
                 btnInstallIpa.Enabled = true;
                 btnDetectDevice.Enabled = true;
             }
