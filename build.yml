@@ -1,0 +1,53 @@
+﻿name: Build iOS IPA
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: List files
+      run: ls -la
+    
+    - name: Build iOS app (unsigned)
+      run: |
+        cd iOSClient
+        xcodebuild -project MCRemoteClient.xcodeproj \
+          -scheme MCRemoteClient \
+          -configuration Release \
+          -sdk iphoneos \
+          -derivedDataPath build \
+          CODE_SIGNING_ALLOWED=NO \
+          CODE_SIGNING_REQUIRED=NO \
+          CODE_SIGN_IDENTITY="" \
+          build
+    
+    - name: Create IPA
+      run: |
+        cd iOSClient
+        APP_PATH="build/Build/Products/Release-iphoneos/MCRemoteClient.app"
+        if [ -d "$APP_PATH" ]; then
+          mkdir -p Payload
+          cp -R "$APP_PATH" Payload/
+          zip -r MCRemoteClient.ipa Payload
+          echo "IPA created successfully"
+          ls -la MCRemoteClient.ipa
+        else
+          echo "APP not found, searching..."
+          find build -name "*.app" -type d
+          exit 1
+        fi
+    
+    - name: Upload IPA
+      uses: actions/upload-artifact@v4
+      with:
+        name: MCRemoteClient-IPA
+        path: iOSClient/MCRemoteClient.ipa
+        if-no-files-found: error
