@@ -1,0 +1,53 @@
+name: Build iOS IPA
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    - name: Setup project structure
+      run: |
+        mkdir -p iOSClient/MCRemoteClient.xcodeproj
+        mkdir -p iOSClient/MCRemoteClient/Assets.xcassets/AppIcon.appiconset
+        mkdir -p iOSClient/MCRemoteClient/Base.lproj
+        mv AppDelegate.swift iOSClient/MCRemoteClient/ 2>/dev/null || true
+        mv ConnectViewController.swift iOSClient/MCRemoteClient/ 2>/dev/null || true
+        mv MainViewController.swift iOSClient/MCRemoteClient/ 2>/dev/null || true
+        mv UdpClient.swift iOSClient/MCRemoteClient/ 2>/dev/null || true
+        mv Info.plist iOSClient/MCRemoteClient/ 2>/dev/null || true
+        mv LaunchScreen.storyboard iOSClient/MCRemoteClient/Base.lproj/ 2>/dev/null || true
+        mv Contents.json iOSClient/MCRemoteClient/Assets.xcassets/ 2>/dev/null || true
+        printf '{\n  \"images\" : [\n    {\n      \"idiom\" : \"universal\",\n      \"platform\" : \"ios\",\n      \"size\" : \"1024x1024\"\n    }\n  ],\n  \"info\" : {\n    \"author\" : \"xcode\",\n    \"version\" : 1\n  }\n}\n' > iOSClient/MCRemoteClient/Assets.xcassets/AppIcon.appiconset/Contents.json
+        mv project.pbxproj iOSClient/MCRemoteClient.xcodeproj/ 2>/dev/null || true
+        find iOSClient -type f
+    - name: Build iOS app
+      run: |
+        cd iOSClient
+        xcodebuild -project MCRemoteClient.xcodeproj -scheme MCRemoteClient -configuration Release -sdk iphoneos -derivedDataPath build CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" build
+    - name: Create IPA
+      run: |
+        cd iOSClient
+        APP_PATH=$(find build -name "*.app" -type d | head -1)
+        if [ -n "$APP_PATH" ]; then
+          mkdir -p Payload
+          cp -R "$APP_PATH" Payload/
+          zip -r MCRemoteClient.ipa Payload
+          echo "IPA created"
+          ls -la MCRemoteClient.ipa
+        else
+          echo "APP not found"
+          find build -name "*.app" -type d
+          exit 1
+        fi
+    - name: Upload IPA
+      uses: actions/upload-artifact@v4
+      with:
+        name: MCRemoteClient-IPA
+        path: iOSClient/MCRemoteClient.ipa
+        if-no-files-found: error
