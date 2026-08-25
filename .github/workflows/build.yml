@@ -49,7 +49,6 @@ jobs:
           -target MCRemoteClient \
           -configuration Release \
           -sdk iphoneos \
-          -derivedDataPath build \
           CODE_SIGNING_ALLOWED=NO \
           CODE_SIGNING_REQUIRED=NO \
           CODE_SIGN_IDENTITY="" \
@@ -59,14 +58,14 @@ jobs:
       run: |
         cd iOSClient
         echo "=== Find .app files ==="
-        find build -type d -name "*.app" 2>/dev/null
+        find . -type d -name "*.app" 2>/dev/null
         echo "=== Build tree ==="
-        find build -maxdepth 6 -type d | head -40
-        APP_PATH=$(find build -type d -name "*.app" | head -1)
+        find build -maxdepth 4 -type d 2>/dev/null | head -30
+        APP_PATH=$(find . -type d -name "*.app" | head -1)
         echo "APP_PATH: $APP_PATH"
         if [ -z "$APP_PATH" ]; then
           echo "ERROR: .app not found!"
-          find build -maxdepth 8
+          find . -maxdepth 6 -type d
           exit 1
         fi
         ls -la "$APP_PATH"
